@@ -1,2 +1,2 @@
 # Satluj-ui
-buildinbg on my own
+building on my own
