@@ -2,6 +2,7 @@
   "dependencies": {
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-scripts": "^5.0.1"
+    "react-scripts": "^0.0.0",
+    "systeminformation": "^5.31.5"
   }
 }
