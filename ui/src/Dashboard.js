@@ -267,7 +267,7 @@ function Dashboard() {
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
             <div style={{ width:"32px", height:"32px", borderRadius:"8px", background:"linear-gradient(135deg,#38bdf8,#818cf8)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"14px", color:"#fff" }}>◈</div>
             <div>
-              <div style={{ fontFamily:"var(--font-display)", fontWeight:"800", fontSize:"15px", letterSpacing:"-0.02em" }}>Bulla UI</div>
+              <div style={{ fontFamily:"var(--font-display)", fontWeight:"800", fontSize:"15px", letterSpacing:"-0.02em" }}>Satluj.UI</div>
               <div style={{ fontFamily:"var(--font-mono)", fontSize:"9px", color:"var(--muted)", letterSpacing:"0.1em" }}>CONTROL PANEL</div>
             </div>
           </div>
