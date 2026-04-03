@@ -807,6 +807,27 @@ function Dashboard() {
           </div>
         )}
       </main>
+
+      {/* Watermark */}
+      <div style={{
+        position: "fixed",
+        bottom: "20px",
+        right: "20px",
+        fontFamily: "var(--font-mono)",
+        fontSize: "13px",
+        fontWeight: "500",
+        color: isLight ? "#64748b" : "#94a3b8",
+        opacity: 0.85,
+        pointerEvents: "none",
+        letterSpacing: "0.05em",
+        padding: "8px 12px",
+        background: isLight ? "rgba(226,232,240,0.5)" : "rgba(15,23,42,0.5)",
+        border: isLight ? "1px solid rgba(100,116,139,0.2)" : "1px solid rgba(99,179,237,0.1)",
+        borderRadius: "6px",
+        backdropFilter: "blur(4px)"
+      }}>
+        Powered by Ayush Bakaya
+      </div>
     </div>
   );
 }
