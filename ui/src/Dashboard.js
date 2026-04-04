@@ -302,6 +302,499 @@ function DonutChart({ segments, size=120 }) {
 }
 
 // ─────────────────────────────────────────────
+// SERVERS PAGE
+// ─────────────────────────────────────────────
+function ServersPage({ onBack, theme }) {
+  const [serversData, setServersData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newServer, setNewServer] = useState({ name: "", ip_address: "", port: "22", username: "root" });
+  const [adding, setAdding] = useState(false);
+  const isLight = theme === "light";
+
+  // Fetch servers
+  useEffect(() => {
+    fetchServers();
+    const interval = setInterval(fetchServers, 15000); // Refresh every 15 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchServers = () => {
+    setLoading(true);
+    axios.get("http://localhost:8001/servers")
+      .then(res => {
+        setServersData(res.data.servers || []);
+        setError(null);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Servers API error:", err);
+        setError(true);
+        setLoading(false);
+      });
+  };
+
+  const handleAddServer = async () => {
+    if (!newServer.name || !newServer.ip_address) {
+      alert("Please fill in all required fields");
+      return;
+    }
+    
+    setAdding(true);
+    try {
+      await axios.post("http://localhost:8001/servers", newServer);
+      setNewServer({ name: "", ip_address: "", port: "22", username: "root" });
+      setShowAddModal(false);
+      fetchServers();
+    } catch (err) {
+      alert(err.response?.data?.detail || "Failed to add server");
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleDeleteServer = async (serverId) => {
+    if (!window.confirm("Are you sure you want to delete this server?")) return;
+    
+    try {
+      await axios.delete(`http://localhost:8001/servers/${serverId}`);
+      fetchServers();
+    } catch (err) {
+      alert("Failed to delete server");
+    }
+  };
+
+  const handleRefreshMetrics = async (serverId) => {
+    try {
+      await axios.post(`http://localhost:8001/servers/${serverId}/refresh`);
+      fetchServers();
+    } catch (err) {
+      alert("Failed to refresh metrics");
+    }
+  };
+
+  const exportToCSV = () => {
+    try {
+      axios.get("http://localhost:8001/servers-export/csv")
+        .then(res => {
+          const csvContent = res.data.content;
+          const blob = new Blob([csvContent], { type: "text/csv" });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `servers_${new Date().getTime()}.csv`;
+          a.click();
+          window.URL.revokeObjectURL(url);
+        });
+    } catch (err) {
+      alert("Failed to export CSV");
+    }
+  };
+
+  const getHealthColor = (status) => {
+    if (status === "online") return "#34d399";
+    if (status === "offline") return "#fb923c";
+    return "#64748b";
+  };
+
+  const getUtilizationColor = (value) => {
+    if (value > 80) return "#fb923c";
+    if (value > 60) return "#fbbf24";
+    return "#34d399";
+  };
+
+  return (
+    <div className="page-enter" style={{ padding: "32px", flex: 1 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "28px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <button className="back-btn" onClick={onBack}>← BACK</button>
+          <div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: "10px", letterSpacing: "0.14em", color: "var(--muted)", marginBottom: "4px" }}>INFRASTRUCTURE</div>
+            <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontWeight: "800", fontSize: "22px", letterSpacing: "-0.03em" }}>Servers</h2>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <button onClick={() => setShowAddModal(true)} style={{ fontFamily: "var(--font-mono)", fontSize: "12px", background: "#38bdf8", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "600", letterSpacing: "0.05em" }}>
+            ➕ ADD SERVER
+          </button>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: "12px", color: "#34d399", background: "rgba(52,211,153,0.1)", padding: "8px 12px", borderRadius: "6px", border: "1px solid rgba(52,211,153,0.2)" }}>
+            ● {serversData.filter(s => s.status === "online").length} Online
+          </div>
+        </div>
+      </div>
+
+      {/* Add Server Modal */}
+      {showAddModal && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "16px", padding: "32px", width: "90%", maxWidth: "500px", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+            <h3 style={{ fontFamily: "var(--font-display)", fontSize: "20px", fontWeight: "700", marginBottom: "20px", color: "var(--text)" }}>Add New Server</h3>
+            
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "6px" }}>Server Name</label>
+              <input
+                type="text"
+                placeholder="e.g., Production Server 1"
+                value={newServer.name}
+                onChange={(e) => setNewServer({ ...newServer, name: e.target.value })}
+                style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text)", fontFamily: "var(--font-mono)", fontSize: "13px", boxSizing: "border-box" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "6px" }}>IP Address</label>
+              <input
+                type="text"
+                placeholder="e.g., 192.168.1.100"
+                value={newServer.ip_address}
+                onChange={(e) => setNewServer({ ...newServer, ip_address: e.target.value })}
+                style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text)", fontFamily: "var(--font-mono)", fontSize: "13px", boxSizing: "border-box" }}
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+              <div>
+                <label style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "6px" }}>Port</label>
+                <input
+                  type="text"
+                  value={newServer.port}
+                  onChange={(e) => setNewServer({ ...newServer, port: e.target.value })}
+                  style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text)", fontFamily: "var(--font-mono)", fontSize: "13px", boxSizing: "border-box" }}
+                />
+              </div>
+              <div>
+                <label style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "6px" }}>Username</label>
+                <input
+                  type="text"
+                  value={newServer.username}
+                  onChange={(e) => setNewServer({ ...newServer, username: e.target.value })}
+                  style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text)", fontFamily: "var(--font-mono)", fontSize: "13px", boxSizing: "border-box" }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button
+                onClick={handleAddServer}
+                disabled={adding}
+                style={{ flex: 1, padding: "10px", background: "#38bdf8", color: "white", border: "none", borderRadius: "8px", fontFamily: "var(--font-mono)", fontSize: "12px", fontWeight: "600", cursor: adding ? "not-allowed" : "pointer", opacity: adding ? 0.6 : 1 }}
+              >
+                {adding ? "ADDING..." : "ADD SERVER"}
+              </button>
+              <button
+                onClick={() => setShowAddModal(false)}
+                style={{ flex: 1, padding: "10px", background: "transparent", color: "var(--muted)", border: "1px solid var(--border)", borderRadius: "8px", fontFamily: "var(--font-mono)", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && !loading && (
+        <div style={{ padding: "16px", background: "rgba(251,146,60,0.1)", border: "1px solid rgba(251,146,60,0.2)", borderRadius: "8px", fontFamily: "var(--font-mono)", fontSize: "12px", color: "#fb923c", marginBottom: "20px" }}>
+          ⚠️ Could not reach servers API on port 8001 — Make sure backend/servers/main.py is running
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px" }}>
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="loading-shimmer" style={{ height: "280px", borderRadius: "16px" }} />
+          ))}
+        </div>
+      )}
+
+      {/* Servers Grid */}
+      {!loading && serversData.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px", marginBottom: "24px" }}>
+          {serversData.map((server, i) => (
+            <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "16px", padding: "20px", boxShadow: "0 2px 8px var(--shadow)", transition: "all 0.3s ease" }} onMouseOver={e => e.currentTarget.style.transform = "translateY(-4px)"} onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}>
+              
+              {/* Server Header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                <div>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: "9px", letterSpacing: "0.14em", color: "var(--muted)", marginBottom: "3px" }}>SERVER</div>
+                  <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "16px", fontWeight: "700", color: "var(--text)" }}>{server.name}</h3>
+                </div>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: getHealthColor(server.status), boxShadow: `0 0 8px ${getHealthColor(server.status)}` }} />
+                </div>
+              </div>
+
+              {/* IP & Status */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "14px" }}>
+                <div style={{ padding: "10px", background: "var(--surface2)", borderRadius: "6px", border: "1px solid var(--border)" }}>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: "8px", color: "var(--muted)", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.05em" }}>IP</div>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--text)", fontWeight: "500" }}>{server.ip_address}</div>
+                </div>
+                <div style={{ padding: "10px", background: "var(--surface2)", borderRadius: "6px", border: "1px solid var(--border)" }}>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: "8px", color: "var(--muted)", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Status</div>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: getHealthColor(server.status), fontWeight: "600", textTransform: "capitalize" }}>● {server.status}</div>
+                </div>
+              </div>
+
+              {/* Metrics */}
+              <div style={{ marginBottom: "14px" }}>
+                {/* CPU */}
+                <div style={{ marginBottom: "10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", color: "#38bdf8", fontWeight: "600", textTransform: "uppercase" }}>CPU</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: getUtilizationColor(server.cpu), fontWeight: "600" }}>{server.cpu.toFixed(1)}%</span>
+                  </div>
+                  <div style={{ height: "3px", background: "var(--border)", borderRadius: "1px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${server.cpu}%`, background: getUtilizationColor(server.cpu), transition: "width 0.3s ease" }} />
+                  </div>
+                </div>
+
+                {/* RAM */}
+                <div style={{ marginBottom: "10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", color: "#818cf8", fontWeight: "600", textTransform: "uppercase" }}>RAM</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: getUtilizationColor(server.ram), fontWeight: "600" }}>{server.ram.toFixed(1)}%</span>
+                  </div>
+                  <div style={{ height: "3px", background: "var(--border)", borderRadius: "1px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${server.ram}%`, background: getUtilizationColor(server.ram), transition: "width 0.3s ease" }} />
+                  </div>
+                </div>
+
+                {/* DISK */}
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", color: "#fbbf24", fontWeight: "600", textTransform: "uppercase" }}>DISK</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: getUtilizationColor(server.disk), fontWeight: "600" }}>{server.disk.toFixed(1)}%</span>
+                  </div>
+                  <div style={{ height: "3px", background: "var(--border)", borderRadius: "1px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${server.disk}%`, background: getUtilizationColor(server.disk), transition: "width 0.3s ease" }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Temperature */}
+              {server.temperature && (
+                <div style={{ padding: "8px", background: "rgba(251,146,60,0.1)", border: "1px solid rgba(251,146,60,0.2)", borderRadius: "6px", fontFamily: "var(--font-mono)", fontSize: "10px", color: "#fb923c", marginBottom: "12px", textAlign: "center", fontWeight: "600" }}>
+                  🌡️ {server.temperature.toFixed(1)}°C
+                </div>
+              )}
+
+              {/* Actions */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                <button
+                  onClick={() => handleRefreshMetrics(server.id)}
+                  style={{ padding: "8px", background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.2)", color: "#38bdf8", borderRadius: "6px", fontFamily: "var(--font-mono)", fontSize: "10px", fontWeight: "600", cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.05em" }}
+                >
+                  🔄 Refresh
+                </button>
+                <button
+                  onClick={() => handleDeleteServer(server.id)}
+                  style={{ padding: "8px", background: "rgba(251,146,60,0.1)", border: "1px solid rgba(251,146,60,0.2)", color: "#fb923c", borderRadius: "6px", fontFamily: "var(--font-mono)", fontSize: "10px", fontWeight: "600", cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.05em" }}
+                >
+                  🗑️ Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && serversData.length === 0 && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 32px", color: "var(--muted)" }}>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: "48px", opacity: 0.2, marginBottom: "16px" }}>🖥️</div>
+          <div style={{ fontFamily: "var(--font-display)", fontSize: "20px", fontWeight: "700", color: "var(--text)", marginBottom: "8px" }}>No Servers Added</div>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: "13px", color: "var(--muted)", marginBottom: "20px", textAlign: "center" }}>Add your first server to monitor CPU, RAM, and disk usage in real-time</div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            style={{ fontFamily: "var(--font-mono)", fontSize: "12px", background: "#38bdf8", color: "white", border: "none", padding: "10px 20px", borderRadius: "8px", cursor: "pointer", fontWeight: "600", letterSpacing: "0.05em" }}
+          >
+            + ADD YOUR FIRST SERVER
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// USERS PAGE
+// ─────────────────────────────────────────────
+function UsersPage({ onBack, theme }) {
+  const [usersData, setUsersData] = useState({
+    active_users: [],
+    activity_logs: []
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const isLight = theme === "light";
+
+  useEffect(() => {
+    // Function to fetch users and activity logs
+    const fetchUserData = () => {
+      setLoading(true);
+      setError(null);
+      
+      // Get token from localStorage
+      const token = localStorage.getItem("authToken") || "token-default";
+      
+      Promise.all([
+        axios.get(`http://localhost:8000/active-users?token=${token}`),
+        axios.get(`http://localhost:8000/activity-logs?token=${token}`)
+      ])
+        .then(([usersRes, logsRes]) => {
+          setUsersData({
+            active_users: usersRes.data.active_users || [],
+            activity_logs: logsRes.data.activity_logs || []
+          });
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error("Users/Logs API error:", err);
+          setError(true);
+          setLoading(false);
+        });
+    };
+
+    // Fetch immediately on component mount
+    fetchUserData();
+
+    // Set up auto-refresh every 10 seconds
+    const interval = setInterval(fetchUserData, 10000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(interval);
+  }, []);
+
+  const getStatusColor = (status) => {
+    if (status === "online") return "#34d399";
+    if (status === "idle") return "#fbbf24";
+    return "#64748b";
+  };
+
+  const getActivityColor = (type) => {
+    const colors = {
+      login: "#34d399",
+      logout: "#fb923c",
+      access: "#38bdf8",
+      view: "#818cf8",
+      download: "#fbbf24",
+      upload: "#34d399",
+      update: "#fb923c"
+    };
+    return colors[type] || "#64748b";
+  };
+
+  return (
+    <div className="page-enter" style={{ padding:"32px", flex:1 }}>
+      {error && (
+        <div style={{ background:"rgba(239,68,68,0.1)", border:"1px solid rgba(239,68,68,0.3)", borderRadius:"8px", padding:"16px", marginBottom:"24px", display:"flex", alignItems:"center", gap:"12px" }}>
+          <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:"#ef4444", flexShrink:0 }} />
+          <div style={{ fontFamily:"var(--font-mono)", fontSize:"12px", color:"#ef4444" }}>Failed to load users data. Make sure the backend is running on http://localhost:8000</div>
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ textAlign:"center", padding:"32px", color:"var(--muted)" }}>
+          <div style={{ fontFamily:"var(--font-mono)", fontSize:"12px" }}>Loading users and activity logs...</div>
+        </div>
+      )}
+
+      {!loading && !error && (
+      <>
+      {/* Header */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"28px" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"16px" }}>
+          <button className="back-btn" onClick={onBack}>← BACK</button>
+          <div>
+            <div style={{ fontFamily:"var(--font-mono)", fontSize:"10px", letterSpacing:"0.14em", color:"var(--muted)", marginBottom:"4px" }}>MANAGEMENT</div>
+            <h2 style={{ margin:0, fontFamily:"var(--font-display)", fontWeight:"800", fontSize:"22px", letterSpacing:"-0.03em" }}>Active Users</h2>
+          </div>
+        </div>
+        <div style={{ fontFamily:"var(--font-mono)", fontSize:"12px", color:"#34d399", background:"rgba(52,211,153,0.1)", padding:"6px 12px", borderRadius:"6px", border:"1px solid rgba(52,211,153,0.2)" }}>
+          ● {usersData.active_users.filter(u => u.status === "online").length} Online
+        </div>
+      </div>
+
+      {/* Active Users Section */}
+      <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:"16px", overflow:"hidden", boxShadow:"0 2px 8px var(--shadow)", marginBottom:"24px" }}>
+        <div style={{ padding:"24px", borderBottom:"1px solid var(--border)" }}>
+          <div style={{ fontFamily:"var(--font-mono)", fontSize:"10px", letterSpacing:"0.14em", color:"var(--muted)", marginBottom:"4px" }}>ACTIVE USERS</div>
+          <h3 style={{ margin:0, fontFamily:"var(--font-display)", fontWeight:"700", fontSize:"16px" }}>Connected Users</h3>
+        </div>
+        <div style={{ overflowX:"auto" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <thead>
+              <tr style={{ background: isLight ? "rgba(100,116,139,0.05)" : "rgba(255,255,255,0.03)" }}>
+                <th style={{ padding:"16px", textAlign:"left", fontFamily:"var(--font-mono)", fontSize:"9px", letterSpacing:"0.12em", color:"var(--muted)", textTransform:"uppercase", fontWeight:"500" }}>NAME</th>
+                <th style={{ padding:"16px", textAlign:"left", fontFamily:"var(--font-mono)", fontSize:"9px", letterSpacing:"0.12em", color:"var(--muted)", textTransform:"uppercase", fontWeight:"500" }}>EMAIL</th>
+                <th style={{ padding:"16px", textAlign:"left", fontFamily:"var(--font-mono)", fontSize:"9px", letterSpacing:"0.12em", color:"var(--muted)", textTransform:"uppercase", fontWeight:"500" }}>ROLE</th>
+                <th style={{ padding:"16px", textAlign:"left", fontFamily:"var(--font-mono)", fontSize:"9px", letterSpacing:"0.12em", color:"var(--muted)", textTransform:"uppercase", fontWeight:"500" }}>STATUS</th>
+                <th style={{ padding:"16px", textAlign:"left", fontFamily:"var(--font-mono)", fontSize:"9px", letterSpacing:"0.12em", color:"var(--muted)", textTransform:"uppercase", fontWeight:"500" }}>LOGIN TIME</th>
+                <th style={{ padding:"16px", textAlign:"left", fontFamily:"var(--font-mono)", fontSize:"9px", letterSpacing:"0.12em", color:"var(--muted)", textTransform:"uppercase", fontWeight:"500" }}>LAST ACTIVE</th>
+              </tr>
+            </thead>
+            <tbody>
+              {usersData.active_users.map((user, i) => (
+                <tr key={i} style={{ borderBottom:"1px solid var(--border)", transition:"background 0.2s ease" }} onMouseOver={e => e.currentTarget.style.background = "rgba(56,189,248,0.04)"} onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                  <td style={{ padding:"16px", fontFamily:"var(--font-mono)", fontSize:"13px", color:"var(--text)" }}>{user.name}</td>
+                  <td style={{ padding:"16px", fontFamily:"var(--font-mono)", fontSize:"13px", color:"var(--muted)" }}>{user.email}</td>
+                  <td style={{ padding:"16px" }}>
+                    <span style={{ fontFamily:"var(--font-mono)", fontSize:"11px", fontWeight:"500", padding:"4px 8px", borderRadius:"4px", background: user.role === "admin" ? "rgba(251,146,60,0.15)" : "rgba(56,189,248,0.15)", color: user.role === "admin" ? "#fb923c" : "#38bdf8", textTransform:"capitalize", letterSpacing:"0.05em" }}>
+                      {user.role || "user"}
+                    </span>
+                  </td>
+                  <td style={{ padding:"16px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:"6px" }}>
+                      <div style={{ width:"6px", height:"6px", borderRadius:"50%", background: getStatusColor(user.status), boxShadow: `0 0 8px ${getStatusColor(user.status)}` }} />
+                      <span style={{ fontFamily:"var(--font-mono)", fontSize:"12px", color: getStatusColor(user.status), textTransform:"capitalize" }}>{user.status}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding:"16px", fontFamily:"var(--font-mono)", fontSize:"13px", color:"var(--text)" }}>{user.loginTime}</td>
+                  <td style={{ padding:"16px", fontFamily:"var(--font-mono)", fontSize:"13px", color:"var(--muted)" }}>{user.lastActive}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Activity Logs Section */}
+      <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:"16px", overflow:"hidden", boxShadow:"0 2px 8px var(--shadow)" }}>
+        <div style={{ padding:"24px", borderBottom:"1px solid var(--border)" }}>
+          <div style={{ fontFamily:"var(--font-mono)", fontSize:"10px", letterSpacing:"0.14em", color:"var(--muted)", marginBottom:"4px" }}>ACTIVITY LOG</div>
+          <h3 style={{ margin:0, fontFamily:"var(--font-display)", fontWeight:"700", fontSize:"16px" }}>User Activities</h3>
+        </div>
+        <div style={{ padding:"16px" }}>
+          {usersData.activity_logs.map((log, i) => (
+            <div key={i} style={{ display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderBottom: i === usersData.activity_logs.length - 1 ? "none" : "1px solid var(--border)", transition:"background 0.2s ease" }} onMouseOver={e => e.currentTarget.style.background = "rgba(56,189,248,0.04)"} onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+              <div style={{ width:"4px", height:"4px", borderRadius:"50%", background: getActivityColor(log.type), flexShrink:0 }} />
+              <div style={{ flex:1 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px" }}>
+                  <span style={{ fontFamily:"var(--font-mono)", fontSize:"12px", fontWeight:"500", color:"var(--text)" }}>{log.user}</span>
+                  <span style={{ fontFamily:"var(--font-mono)", fontSize:"10px", color:getActivityColor(log.type), background: `${getActivityColor(log.type)}20`, padding:"2px 6px", borderRadius:"4px", textTransform:"uppercase", letterSpacing:"0.05em" }}>{log.type}</span>
+                  {log.role && (
+                    <span style={{ fontFamily:"var(--font-mono)", fontSize:"10px", color: log.role === "admin" ? "#fb923c" : "#38bdf8", background: log.role === "admin" ? "rgba(251,146,60,0.15)" : "rgba(56,189,248,0.15)", padding:"2px 6px", borderRadius:"4px", textTransform:"capitalize", letterSpacing:"0.05em" }}>
+                      {log.role}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontFamily:"var(--font-mono)", fontSize:"12px", color:"var(--muted)" }}>{log.details || log.action}</div>
+              </div>
+              <div style={{ fontFamily:"var(--font-mono)", fontSize:"11px", color:"var(--muted)", whiteSpace:"nowrap" }}>{log.timestamp}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      </>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // ANALYTICS PAGE
 // ─────────────────────────────────────────────
 function AnalyticsPage({ onBack, theme }) {
@@ -309,16 +802,21 @@ function AnalyticsPage({ onBack, theme }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [serversAnalytics, setServersAnalytics] = useState([]);
+  const [selectedServer, setSelectedServer] = useState(null);
   const isLight = theme === "light";
 
   useEffect(() => {
     // Function to fetch analytics data
     const fetchAnalytics = () => {
       setLoading(true);
-      axios.get("http://localhost:9000/analytics")
-        .then(res => { 
-          // Set actual system metrics from API
-          setAnalyticsData(res.data);
+      Promise.all([
+        axios.get("http://localhost:9000/analytics"),
+        axios.get("http://localhost:8001/servers").catch(() => ({ data: [] }))
+      ])
+        .then(([analyticsRes, serversRes]) => {
+          setAnalyticsData(analyticsRes.data);
+          setServersAnalytics(serversRes.data.servers || serversRes.data || []);
           setLoading(false);
           setError(null);
         })
@@ -340,7 +838,7 @@ function AnalyticsPage({ onBack, theme }) {
     return () => clearInterval(interval);
   }, []);
 
-  const TABS = ["overview", "traffic", "pages"];
+  const TABS = ["overview", "traffic", "pages", "servers"];
 
   const StatCard = ({ label, value, delta, deltaUp, trend, color }) => (
     <div className="analytics-stat-card">
@@ -589,6 +1087,225 @@ function AnalyticsPage({ onBack, theme }) {
               </div>
             </div>
           )}
+
+          {/* ── SERVERS TAB ── */}
+          {activeTab === "servers" && (
+            <div style={{ display:"flex", flexDirection:"column", gap:"20px" }}>
+              {/* Server Selection */}
+              <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:"16px", padding:"24px", boxShadow:"0 2px 8px var(--shadow)" }}>
+                <div style={{ fontFamily:"var(--font-mono)", fontSize:"10px", letterSpacing:"0.14em", color:"var(--muted)", marginBottom:"16px" }}>SELECT SERVER</div>
+                
+                {serversAnalytics && serversAnalytics.length > 0 ? (
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:"16px" }}>
+                    {serversAnalytics.map((server, idx) => {
+                      const isSelected = selectedServer?.id === server.id;
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => setSelectedServer(server)}
+                          style={{
+                            background:"var(--surface2)",
+                            border:`2px solid ${isSelected ? '#38bdf8' : 'var(--border)'}`,
+                            borderRadius:"12px",
+                            padding:"16px",
+                            cursor:"pointer",
+                            transition:"all 0.2s ease",
+                            transform: isSelected ? "scale(1.02)" : "scale(1)",
+                            boxShadow: isSelected ? "0 0 12px rgba(56,189,248,0.2)" : "none"
+                          }}
+                          onMouseOver={e => {
+                            if (!isSelected) e.currentTarget.style.borderColor = "rgba(56,189,248,0.5)";
+                          }}
+                          onMouseOut={e => {
+                            if (!isSelected) e.currentTarget.style.borderColor = "var(--border)";
+                          }}
+                        >
+                          {/* Radio Button */}
+                          <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"12px" }}>
+                            <div
+                              style={{
+                                width:"20px",
+                                height:"20px",
+                                borderRadius:"50%",
+                                border:`2px solid ${isSelected ? '#38bdf8' : 'var(--border)'}`,
+                                background: "transparent",
+                                display:"flex",
+                                alignItems:"center",
+                                justifyContent:"center",
+                                transition:"all 0.2s ease",
+                                flexShrink:0
+                              }}
+                            >
+                              {isSelected && <div style={{ width:"10px", height:"10px", borderRadius:"50%", background:"#38bdf8" }} />}
+                            </div>
+                            <div>
+                              <div style={{ fontFamily:"var(--font-display)", fontSize:"14px", fontWeight:"700", color:"var(--text)" }}>{server.name}</div>
+                              <div style={{ fontFamily:"var(--font-mono)", fontSize:"9px", color:"var(--muted)" }}>{server.ip_address}</div>
+                            </div>
+                            <div style={{ marginLeft:"auto", width:"10px", height:"10px", borderRadius:"50%", background: server.status === "online" ? "#34d399" : "#fb923c", boxShadow: `0 0 8px ${server.status === "online" ? "#34d399" : "#fb923c"}`, flexShrink:0 }} />
+                          </div>
+
+                          {/* Quick Metrics */}
+                          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"8px" }}>
+                            <div style={{ padding:"8px", background:"var(--surface)", borderRadius:"6px", textAlign:"center" }}>
+                              <div style={{ fontFamily:"var(--font-mono)", fontSize:"8px", color:"#38bdf8", marginBottom:"2px", fontWeight:"600" }}>CPU</div>
+                              <div style={{ fontFamily:"var(--font-display)", fontSize:"14px", fontWeight:"700", color:"#38bdf8" }}>{server.cpu.toFixed(1)}%</div>
+                            </div>
+                            <div style={{ padding:"8px", background:"var(--surface)", borderRadius:"6px", textAlign:"center" }}>
+                              <div style={{ fontFamily:"var(--font-mono)", fontSize:"8px", color:"#818cf8", marginBottom:"2px", fontWeight:"600" }}>RAM</div>
+                              <div style={{ fontFamily:"var(--font-display)", fontSize:"14px", fontWeight:"700", color:"#818cf8" }}>{server.ram.toFixed(1)}%</div>
+                            </div>
+                            <div style={{ padding:"8px", background:"var(--surface)", borderRadius:"6px", textAlign:"center" }}>
+                              <div style={{ fontFamily:"var(--font-mono)", fontSize:"8px", color:"#fbbf24", marginBottom:"2px", fontWeight:"600" }}>DISK</div>
+                              <div style={{ fontFamily:"var(--font-display)", fontSize:"14px", fontWeight:"700", color:"#fbbf24" }}>{server.disk.toFixed(1)}%</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ padding:"40px", textAlign:"center", color:"var(--muted)" }}>
+                    <div style={{ fontFamily:"var(--font-mono)", fontSize:"13px" }}>No servers added yet</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Server Details & Graphs */}
+              {selectedServer && (
+                <div style={{ display:"flex", flexDirection:"column", gap:"20px" }}>
+                  {/* Server Info */}
+                  <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:"16px", padding:"24px", boxShadow:"0 2px 8px var(--shadow)" }}>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"20px" }}>
+                      <div>
+                        <div style={{ fontFamily:"var(--font-mono)", fontSize:"10px", letterSpacing:"0.14em", color:"var(--muted)", marginBottom:"4px" }}>SERVER INFORMATION</div>
+                        <h3 style={{ margin:0, fontFamily:"var(--font-display)", fontWeight:"700", fontSize:"18px" }}>{selectedServer.name}</h3>
+                      </div>
+                      <button
+                        onClick={() => setSelectedServer(null)}
+                        style={{ fontFamily:"var(--font-mono)", fontSize:"11px", background:"transparent", color:"var(--muted)", border:"1px solid var(--border)", padding:"8px 16px", borderRadius:"6px", cursor:"pointer", fontWeight:"600", letterSpacing:"0.05em", textTransform:"uppercase" }}
+                      >
+                        ✕ CLOSE
+                      </button>
+                    </div>
+
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(150px, 1fr))", gap:"12px", marginBottom:"20px" }}>
+                      <div style={{ padding:"12px", background:"var(--surface2)", borderRadius:"8px", border:"1px solid var(--border)" }}>
+                        <div style={{ fontFamily:"var(--font-mono)", fontSize:"8px", color:"var(--muted)", marginBottom:"4px", textTransform:"uppercase" }}>IP Address</div>
+                        <div style={{ fontFamily:"var(--font-mono)", fontSize:"12px", fontWeight:"600", color:"var(--text)" }}>{selectedServer.ip_address}</div>
+                        <div style={{ fontFamily:"var(--font-mono)", fontSize:"9px", color:"var(--muted)", marginTop:"2px" }}>Port: {selectedServer.port}</div>
+                      </div>
+                      <div style={{ padding:"12px", background:"var(--surface2)", borderRadius:"8px", border:"1px solid var(--border)" }}>
+                        <div style={{ fontFamily:"var(--font-mono)", fontSize:"8px", color:"var(--muted)", marginBottom:"4px", textTransform:"uppercase" }}>Status</div>
+                        <div style={{ display:"flex", alignItems:"center", gap:"6px" }}>
+                          <div style={{ width:"8px", height:"8px", borderRadius:"50%", background: selectedServer.status === "online" ? "#34d399" : "#fb923c", boxShadow: `0 0 8px ${selectedServer.status === "online" ? "#34d399" : "#fb923c"}` }} />
+                          <div style={{ fontFamily:"var(--font-mono)", fontSize:"11px", fontWeight:"600", color: selectedServer.status === "online" ? "#34d399" : "#fb923c", textTransform:"capitalize" }}>{selectedServer.status}</div>
+                        </div>
+                      </div>
+                      <div style={{ padding:"12px", background:"var(--surface2)", borderRadius:"8px", border:"1px solid var(--border)" }}>
+                        <div style={{ fontFamily:"var(--font-mono)", fontSize:"8px", color:"var(--muted)", marginBottom:"4px", textTransform:"uppercase" }}>Updated</div>
+                        <div style={{ fontFamily:"var(--font-mono)", fontSize:"11px", fontWeight:"500", color:"var(--text)" }}>
+                          {new Date(selectedServer.last_updated).toLocaleTimeString()}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Large Gauges */}
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(200px, 1fr))", gap:"20px" }}>
+                      {/* CPU Gauge */}
+                      <div style={{ textAlign:"center" }}>
+                        <svg width="180" height="180" style={{ margin:"0 auto", display:"block", transform:"rotate(-90deg)" }}>
+                          <circle cx="90" cy="90" r="70" fill="none" stroke="var(--border)" strokeWidth="10" />
+                          <circle cx="90" cy="90" r="70" fill="none" stroke="#38bdf8" strokeWidth="10" strokeDasharray={`${2*Math.PI*70}`} strokeDashoffset={`${2*Math.PI*70*(1-selectedServer.cpu/100)}`} strokeLinecap="round" style={{ transition:"stroke-dashoffset 0.5s ease" }} />
+                        </svg>
+                        <div style={{ fontFamily:"var(--font-display)", fontSize:"28px", fontWeight:"bold", color:"#38bdf8", marginTop:"-60px" }}>{selectedServer.cpu.toFixed(1)}%</div>
+                        <div style={{ fontFamily:"var(--font-mono)", fontSize:"9px", color:"var(--muted)", marginTop:"8px", textTransform:"uppercase", letterSpacing:"0.05em" }}>CPU Usage</div>
+                      </div>
+
+                      {/* RAM Gauge */}
+                      <div style={{ textAlign:"center" }}>
+                        <svg width="180" height="180" style={{ margin:"0 auto", display:"block", transform:"rotate(-90deg)" }}>
+                          <circle cx="90" cy="90" r="70" fill="none" stroke="var(--border)" strokeWidth="10" />
+                          <circle cx="90" cy="90" r="70" fill="none" stroke="#818cf8" strokeWidth="10" strokeDasharray={`${2*Math.PI*70}`} strokeDashoffset={`${2*Math.PI*70*(1-selectedServer.ram/100)}`} strokeLinecap="round" style={{ transition:"stroke-dashoffset 0.5s ease" }} />
+                        </svg>
+                        <div style={{ fontFamily:"var(--font-display)", fontSize:"28px", fontWeight:"bold", color:"#818cf8", marginTop:"-60px" }}>{selectedServer.ram.toFixed(1)}%</div>
+                        <div style={{ fontFamily:"var(--font-mono)", fontSize:"9px", color:"var(--muted)", marginTop:"8px", textTransform:"uppercase", letterSpacing:"0.05em" }}>RAM Usage</div>
+                      </div>
+
+                      {/* DISK Gauge */}
+                      <div style={{ textAlign:"center" }}>
+                        <svg width="180" height="180" style={{ margin:"0 auto", display:"block", transform:"rotate(-90deg)" }}>
+                          <circle cx="90" cy="90" r="70" fill="none" stroke="var(--border)" strokeWidth="10" />
+                          <circle cx="90" cy="90" r="70" fill="none" stroke="#fbbf24" strokeWidth="10" strokeDasharray={`${2*Math.PI*70}`} strokeDashoffset={`${2*Math.PI*70*(1-selectedServer.disk/100)}`} strokeLinecap="round" style={{ transition:"stroke-dashoffset 0.5s ease" }} />
+                        </svg>
+                        <div style={{ fontFamily:"var(--font-display)", fontSize:"28px", fontWeight:"bold", color:"#fbbf24", marginTop:"-60px" }}>{selectedServer.disk.toFixed(1)}%</div>
+                        <div style={{ fontFamily:"var(--font-mono)", fontSize:"9px", color:"var(--muted)", marginTop:"8px", textTransform:"uppercase", letterSpacing:"0.05em" }}>Disk Usage</div>
+                      </div>
+
+                      {/* Temperature */}
+                      {selectedServer.temperature && (
+                        <div style={{ textAlign:"center" }}>
+                          <div style={{ fontFamily:"var(--font-display)", fontSize:"48px", fontWeight:"bold", color:"#fb923c" }}>
+                            {selectedServer.temperature.toFixed(1)}°C
+                          </div>
+                          <div style={{ fontFamily:"var(--font-mono)", fontSize:"9px", color:"var(--muted)", marginTop:"12px", textTransform:"uppercase", letterSpacing:"0.05em" }}>Temperature</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Export Options */}
+                  <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:"16px", padding:"24px", boxShadow:"0 2px 8px var(--shadow)" }}>
+                    <div style={{ fontFamily:"var(--font-mono)", fontSize:"10px", letterSpacing:"0.14em", color:"var(--muted)", marginBottom:"16px" }}>EXPORT DATA</div>
+                    <div style={{ display:"flex", gap:"12px" }}>
+                      <button
+                        onClick={() => {
+                          const csvContent = `Server Analytics Export\nServer Name,${selectedServer.name}\nIP Address,${selectedServer.ip_address}\nPort,${selectedServer.port}\nStatus,${selectedServer.status}\nExport Date,${new Date().toLocaleString()}\n\nMetric,Value,Unit\nCPU Usage,${selectedServer.cpu.toFixed(1)},%\nRAM Usage,${selectedServer.ram.toFixed(1)},%\nDisk Usage,${selectedServer.disk.toFixed(1)},%\nTemperature,${selectedServer.temperature?.toFixed(1) || 'N/A'},°C\n`;
+                          const blob = new Blob([csvContent], { type: "text/csv" });
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `${selectedServer.name}_analytics_${new Date().getTime()}.csv`;
+                          a.click();
+                          window.URL.revokeObjectURL(url);
+                        }}
+                        style={{ fontFamily:"var(--font-mono)", fontSize:"11px", background:"rgba(52,211,153,0.2)", color:"#34d399", border:"1px solid rgba(52,211,153,0.3)", padding:"10px 18px", borderRadius:"6px", cursor:"pointer", fontWeight:"600", letterSpacing:"0.05em", textTransform:"uppercase" }}
+                      >
+                        📊 EXPORT CSV
+                      </button>
+                      <button
+                        onClick={() => {
+                          const jsonContent = JSON.stringify({
+                            serverName: selectedServer.name,
+                            ipAddress: selectedServer.ip_address,
+                            port: selectedServer.port,
+                            status: selectedServer.status,
+                            exportDate: new Date().toISOString(),
+                            metrics: {
+                              cpu: selectedServer.cpu.toFixed(1),
+                              ram: selectedServer.ram.toFixed(1),
+                              disk: selectedServer.disk.toFixed(1),
+                              temperature: selectedServer.temperature?.toFixed(1) || null
+                            }
+                          }, null, 2);
+                          const blob = new Blob([jsonContent], { type: "application/json" });
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `${selectedServer.name}_analytics_${new Date().getTime()}.json`;
+                          a.click();
+                          window.URL.revokeObjectURL(url);
+                        }}
+                        style={{ fontFamily:"var(--font-mono)", fontSize:"11px", background:"rgba(56,189,248,0.2)", color:"#38bdf8", border:"1px solid rgba(56,189,248,0.3)", padding:"10px 18px", borderRadius:"6px", cursor:"pointer", fontWeight:"600", letterSpacing:"0.05em", textTransform:"uppercase" }}
+                      >
+                        📋 EXPORT JSON
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -712,7 +1429,17 @@ function Dashboard() {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  const logout = () => { localStorage.removeItem("token"); window.location.href = "/"; };
+  const logout = async () => {
+    const token = localStorage.getItem("token");
+    try {
+      await axios.post(`http://localhost:8000/logout?token=${token}`);
+    } catch (err) {
+      console.log("Logout API error (not critical):", err);
+    }
+    localStorage.removeItem("token");
+    localStorage.removeItem("activeNav");
+    window.location.href = "/";
+  };
 
   const timeStr = time.toLocaleTimeString("en-US", { hour12:false });
   const dateStr = time.toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric" });
@@ -797,9 +1524,11 @@ function Dashboard() {
         {/* ── Page Router ── */}
         {activeNav === "dashboard" && <DashboardPage data={data} isLight={isLight} />}
         {activeNav === "analytics" && <AnalyticsPage onBack={() => setActiveNav("dashboard")} theme={theme} />}
+        {activeNav === "servers" && <ServersPage onBack={() => setActiveNav("dashboard")} theme={theme} />}
+        {activeNav === "users" && <UsersPage onBack={() => setActiveNav("dashboard")} theme={theme} />}
 
         {/* Placeholder for other pages */}
-        {!["dashboard","analytics"].includes(activeNav) && (
+        {!["dashboard","analytics","servers","users"].includes(activeNav) && (
           <div className="page-enter" style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"12px", padding:"32px" }}>
             <div style={{ fontFamily:"var(--font-mono)", fontSize:"40px", opacity:0.15 }}>◈</div>
             <div style={{ fontFamily:"var(--font-display)", fontSize:"20px", fontWeight:"700", color:"var(--text)", opacity:0.4 }}>{pageTitles[activeNav]}</div>

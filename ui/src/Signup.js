@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 
 function Signup() {
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -12,15 +13,22 @@ function Signup() {
     setError("");
     setLoading(true);
 
+    if (!username || !email || !password) {
+      setError("All fields are required");
+      setLoading(false);
+      return;
+    }
+
     try {
       await axios.post("http://localhost:8000/signup", {
         username,
+        email,
         password
       });
 
       window.location.href = "/";
     } catch (err) {
-      setError("User already exists");
+      setError(err.response?.data?.detail || "Signup failed");
     } finally {
       setLoading(false);
     }
@@ -54,6 +62,13 @@ function Signup() {
           style={styles.input}
           placeholder="Username"
           onChange={(e) => setUsername(e.target.value)}
+        />
+
+        <input
+          style={styles.input}
+          type="email"
+          placeholder="Email"
+          onChange={(e) => setEmail(e.target.value)}
         />
 
         <input

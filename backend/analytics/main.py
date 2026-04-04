@@ -108,3 +108,70 @@ def get_analytics(authorization: str = Header(default=None)):
         "health_color": health_color,
         "logs": logs
     }
+
+# 🔥 USERS API
+@app.get("/users")
+def get_users():
+    import socket
+    import os
+    
+    users = [
+        {
+            "id": 1,
+            "name": "Ayush Bakaya",
+            "email": "ayush@example.com",
+            "status": "online",
+            "lastActive": "Just now",
+            "loginTime": "09:30 AM",
+            "ip": socket.gethostbyname(socket.gethostname()),
+            "joinDate": "2024-01-15"
+        },
+        {
+            "id": 2,
+            "name": "John Doe",
+            "email": "john@example.com",
+            "status": "online",
+            "lastActive": "2 min ago",
+            "loginTime": "02:15 PM",
+            "ip": "192.168.1.101",
+            "joinDate": "2024-02-20"
+        },
+        {
+            "id": 3,
+            "name": "Jane Smith",
+            "email": "jane@example.com",
+            "status": "idle",
+            "lastActive": "5 min ago",
+            "loginTime": "01:45 PM",
+            "ip": "192.168.1.102",
+            "joinDate": "2024-03-10"
+        },
+        {
+            "id": 4,
+            "name": "Mike Wilson",
+            "email": "mike@example.com",
+            "status": "offline",
+            "lastActive": "30 min ago",
+            "loginTime": "11:20 AM",
+            "ip": "192.168.1.103",
+            "joinDate": "2024-01-05"
+        },
+    ]
+    
+    return {"active_users": users}
+
+# 🔥 ACTIVITY LOGS API
+@app.get("/activity-logs")
+def get_activity_logs():
+    logs = [
+        {"id": 1, "user": "Ayush Bakaya", "action": "Accessed Dashboard", "timestamp": "Just now", "type": "access"},
+        {"id": 2, "user": "John Doe", "action": "Viewed Analytics", "timestamp": "2 min ago", "type": "view"},
+        {"id": 3, "user": "Jane Smith", "action": "Downloaded Report", "timestamp": "5 min ago", "type": "download"},
+        {"id": 4, "user": "Ayush Bakaya", "action": "Updated Settings", "timestamp": "8 min ago", "type": "update"},
+        {"id": 5, "user": "Mike Wilson", "action": "Logged Out", "timestamp": "30 min ago", "type": "logout"},
+        {"id": 6, "user": "Jane Smith", "action": "Viewed Users", "timestamp": "1h ago", "type": "view"},
+        {"id": 7, "user": "John Doe", "action": "Uploaded File", "timestamp": "2h ago", "type": "upload"},
+        {"id": 8, "user": "Ayush Bakaya", "action": "Logged In", "timestamp": "3h ago", "type": "login"},
+    ]
+    
+    return {"activity_logs": logs}

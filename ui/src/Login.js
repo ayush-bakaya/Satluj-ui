@@ -22,7 +22,7 @@ function Login() {
       localStorage.setItem("token", res.data.token);
       window.location.href = "/dashboard";
     } catch (err) {
-      setError("Invalid username or password");
+      setError(err.response?.data?.detail || "Invalid username or password");
     } finally {
       setLoading(false);
     }
