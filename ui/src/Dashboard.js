@@ -737,7 +737,7 @@ function Dashboard() {
         {/* Logo */}
         <div style={{ padding:"0 8px 28px", borderBottom:"1px solid var(--border)", marginBottom:"24px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-            <div style={{ width:"32px", height:"32px", borderRadius:"8px", background:"linear-gradient(135deg,#38bdf8,#818cf8)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"14px", color:"#fff" }}>◈</div>
+            <img src="/satluj-logo.svg" alt="Satluj.UI" style={{ width:"32px", height:"32px" }} />
             <div>
               <div style={{ fontFamily:"var(--font-display)", fontWeight:"800", fontSize:"15px", letterSpacing:"-0.02em" }}>Satluj.UI</div>
               <div style={{ fontFamily:"var(--font-mono)", fontSize:"9px", color:"var(--muted)", letterSpacing:"0.1em" }}>CONTROL PANEL</div>
